@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>แดชบอร์ดตัวชี้วัดการพยาบาล รพ.บ้านหมี่</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* =========================================================
+   ตั้งค่าแหล่งข้อมูล (แก้ไขที่ส่วน CONFIG ใน <script> ด้านล่าง)
+   ========================================================= */
+:root{
+  --navy:#0b3c5d; --teal:#0f7c8c; --teal-2:#14a3b4; --teal-soft:#e3f4f6;
+  --green:#1e8e5a; --green-soft:#e2f4ea; --amber:#c98a0b; --amber-soft:#fdf3dc;
+  --red:#c0392b; --red-soft:#fbe7e5; --gray:#5d6b78; --line:#d9e2e8;
+  --bg:#f3f7f9; --card:#ffffff; --ink:#1b2a36;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Sarabun',sans-serif;font-size:15px;line-height:1.55}
+header.top{background:linear-gradient(120deg,var(--navy) 0%,var(--teal) 100%);color:#fff;padding:18px 28px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;border-bottom:4px solid var(--teal-2)}
+.logo{width:54px;height:54px;border-radius:12px;background:#fff;display:grid;place-items:center;flex:none}
+.logo svg{width:34px;height:34px}
+.ttl h1{margin:0;font-size:22px;font-weight:700;letter-spacing:.2px}
+.ttl p{margin:2px 0 0;font-size:14px;opacity:.9}
+.hdr-right{margin-left:auto;text-align:right;font-size:13px}
+.hdr-right .stamp{opacity:.9}
+.btn{font-family:inherit;font-size:14px;border:1px solid rgba(255,255,255,.6);background:rgba(255,255,255,.12);color:#fff;padding:7px 14px;border-radius:8px;cursor:pointer;margin-top:6px}
+.btn:hover{background:rgba(255,255,255,.25)}
+.btn.dark{background:var(--teal);border-color:var(--teal)}
+main{max-width:1380px;margin:0 auto;padding:22px 22px 50px}
+.statusbar{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-left:5px solid var(--teal);border-radius:8px;padding:10px 16px;margin-bottom:18px;font-size:14px}
+.statusbar.err{border-left-color:var(--red);background:var(--red-soft)}
+.prog{flex:1;height:6px;background:#e7eef2;border-radius:4px;overflow:hidden;max-width:320px}
+.prog>div{height:100%;background:var(--teal-2);width:0;transition:width .3s}
+.sec-title{display:flex;align-items:center;gap:10px;margin:28px 0 12px;font-size:18px;font-weight:700;color:var(--navy)}
+.sec-title .no{background:var(--navy);color:#fff;border-radius:6px;padding:1px 9px;font-size:14px}
+.sec-title small{font-weight:400;color:var(--gray);font-size:13px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;box-shadow:0 1px 2px rgba(11,60,93,.05)}
+.kpi .lbl{font-size:13px;color:var(--gray)}
+.kpi .val{font-size:30px;font-weight:700;color:var(--navy);line-height:1.2;margin-top:2px}
+.kpi .val small{font-size:15px;font-weight:500;color:var(--gray)}
+.kpi .sub{font-size:12.5px;color:var(--gray)}
+.kpi{border-top:4px solid var(--teal)}
+.kpi.g{border-top-color:var(--green)} .kpi.a{border-top-color:var(--amber)} .kpi.r{border-top-color:var(--red)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:14px}
+.card h3{margin:0 0 10px;font-size:15.5px;color:var(--navy);font-weight:600}
+.chartbox{position:relative;height:300px}
+.chartbox.tall{height:420px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{background:var(--navy);color:#fff;font-weight:600;padding:9px 8px;text-align:left;position:sticky;top:0;z-index:1;white-space:nowrap}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr.unit-row{cursor:pointer}
+tr.unit-row:hover td{background:var(--teal-soft)}
+tr.grp td{background:#eaf1f5;font-weight:600;color:var(--navy)}
+.num{text-align:center}
+.tblwrap{max-height:560px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.bar{height:8px;background:#e7eef2;border-radius:4px;overflow:hidden;min-width:70px}
+.bar>div{height:100%}
+.badge{display:inline-block;padding:1px 9px;border-radius:20px;font-size:12.5px;font-weight:600;white-space:nowrap}
+.b-g{background:var(--green-soft);color:var(--green)} .b-a{background:var(--amber-soft);color:var(--amber)}
+.b-r{background:var(--red-soft);color:var(--red)} .b-n{background:#eef1f3;color:var(--gray)}
+.b-t{background:var(--teal-soft);color:var(--teal)}
+.chip{display:inline-block;font-size:11.5px;padding:0 6px;border-radius:4px;background:#eef3f6;color:var(--navy);margin:1px 2px 1px 0;border:1px solid #d6e2ea}
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+select,input[type=search]{font-family:inherit;font-size:14px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:#fff;min-width:220px}
+.legend{display:flex;gap:16px;font-size:13px;color:var(--gray);flex-wrap:wrap;margin-top:8px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.actions ol{margin:0;padding-left:22px}
+.actions li{margin-bottom:8px}
+.note{font-size:13px;color:var(--gray);background:#f7fafb;border:1px dashed var(--line);border-radius:8px;padding:10px 14px}
+.mini{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px}
+.mini .card{padding:10px 12px}
+.mini .val{font-size:22px}
+footer{text-align:center;color:var(--gray);font-size:12.5px;margin-top:36px;border-top:1px solid var(--line);padding-top:14px}
+.hidden{display:none!important}
+/* ---------- Layout + Sidebar ---------- */
+.layout{display:flex;align-items:flex-start}
+.layout>main{flex:1;min-width:0;margin:0}
+aside.side{width:300px;flex:none;position:sticky;top:0;height:100vh;overflow:hidden;display:flex;flex-direction:column;background:#fff;border-right:1px solid var(--line);z-index:20}
+.side-head{padding:14px 14px 10px;border-bottom:1px solid var(--line);background:#f7fbfc}
+.side-title{font-weight:700;color:var(--navy);font-size:15px;margin-bottom:8px}
+.side-head select{width:100%;min-width:0;cursor:pointer}
+select{cursor:pointer}
+.side-sum{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.side-sum span{font-size:12px;padding:1px 8px;border-radius:12px;cursor:pointer;border:1px solid transparent}
+.side-sum span.on{border-color:currentColor}
+nav#sideNav{overflow:auto;flex:1;padding:6px 0 30px}
+.si{display:flex;align-items:center;gap:8px;padding:7px 14px 7px 22px;cursor:pointer;color:var(--ink);text-decoration:none;font-size:14px;border-left:4px solid transparent}
+.si:hover{background:var(--teal-soft)}
+.si.active{background:var(--teal-soft);border-left-color:var(--teal);font-weight:600;color:var(--navy)}
+.si .nm{flex:1;line-height:1.3}
+.si .sc{font-size:12px;color:var(--gray);white-space:nowrap}
+.si.home{padding-left:14px;font-weight:600;color:var(--navy);border-bottom:1px solid var(--line);margin-bottom:4px}
+.sg-h{display:flex;align-items:center;gap:6px;width:100%;border:0;background:none;font-family:inherit;text-align:left;padding:9px 14px 5px;font-size:12.5px;font-weight:700;color:var(--teal);cursor:pointer;letter-spacing:.2px}
+.sg-h .cnt{margin-left:auto;font-weight:500;color:var(--gray)}
+.sg-h .car{transition:transform .2s;display:inline-block}
+.sg.closed .car{transform:rotate(-90deg)}
+.sg.closed .sg-b{display:none}
+.btn-side{display:none}
+.unit-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;border-left:6px solid var(--teal)}
+.unit-head h2{margin:2px 0 4px;font-size:22px;color:var(--navy)}
+.crumb{font-size:13px;color:var(--gray)}
+.crumb a{color:var(--teal);cursor:pointer;text-decoration:underline}
+.unit-nav{margin-left:auto;display:flex;gap:8px}
+.btn2{font-family:inherit;font-size:14px;border:1px solid var(--line);background:#fff;color:var(--navy);padding:7px 12px;border-radius:8px;cursor:pointer}
+.btn2:hover{background:var(--teal-soft)}
+.btn2:disabled{opacity:.4;cursor:default}
+@media (max-width:1000px){.grid2,.grid3{grid-template-columns:1fr}}
+@media (max-width:900px){
+  aside.side{position:fixed;left:0;top:0;transform:translateX(-100%);transition:transform .25s;box-shadow:4px 0 18px rgba(0,0,0,.15)}
+  aside.side.open{transform:none}
+  .btn-side{display:inline-block}
+}
+@media (max-width:600px){main{padding:14px}header.top{padding:14px}.hdr-right{margin-left:0;text-align:left}}
+@media print{
+  aside.side{display:none!important}
+  body{background:#fff;font-size:12px}
+  .btn,.btn2,.filters,.statusbar,.unit-nav{display:none!important}
+  header.top{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  th,.badge,.bar>div,.kpi{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .tblwrap{max-height:none;overflow:visible}
+  .card{break-inside:avoid}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="logo" aria-hidden="true">
+    <svg viewBox="0 0 40 40"><rect x="14" y="4" width="12" height="32" rx="2" fill="#0f7c8c"/><rect x="4" y="14" width="32" height="12" rx="2" fill="#0f7c8c"/><path d="M8 20h6l2-4 3 8 3-10 2 6h8" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </div>
+  <div class="ttl">
+    <h1>รายงานตัวชี้วัดคุณภาพการพยาบาล (KPI Dashboard)</h1>
+    <p>กลุ่มภารกิจด้านการพยาบาล โรงพยาบาลบ้านหมี่ · ปีงบประมาณ 2569</p>
+  </div>
+  <div class="hdr-right">
+    <div class="stamp">ข้อมูล ณ <b id="stamp">—</b></div>
+    <div class="stamp">อัปเดตอัตโนมัติทุก <span id="every">5</span> นาที</div>
+    <button class="btn btn-side" id="btnSide">☰ เลือกวอร์ด</button>
+    <button class="btn" id="btnReload">⟳ ดึงข้อมูลล่าสุด</button>
+    <button class="btn" onclick="window.print()">🖶 พิมพ์รายงาน</button>
+  </div>
+</header>
+
+<div class="layout">
+<aside class="side" id="side">
+  <div class="side-head">
+    <div class="side-title">เลือกหน่วยงาน / วอร์ด</div>
+    <select id="sGroup"><option value="">— แสดงทุกกลุ่มงาน —</option></select>
+    <div class="side-sum" id="sideSum"></div>
+  </div>
+  <nav id="sideNav"></nav>
+</aside>
+
+<main>
+  <div class="statusbar" id="status">
+    <span id="statusText">กำลังเชื่อมต่อ Google Sheets…</span>
+    <div class="prog"><div id="progBar"></div></div>
+  </div>
+
+  <!-- ===================== มุมมองภาพรวมโรงพยาบาล ===================== -->
+  <section id="viewOverview">
+    <div class="sec-title"><span class="no">1</span> ภาพรวมระดับโรงพยาบาล <small>สรุปจากทุกหน่วยงานในชีต Mapping</small></div>
+    <div class="cards" id="overviewCards"></div>
+
+    <div id="perfSection" class="hidden">
+      <div class="sec-title"><span class="no">2</span> ผลการดำเนินงานเทียบเกณฑ์เป้าหมาย <small>คำนวณจากคอลัมน์ผลงานล่าสุดของแต่ละตัวชี้วัด</small></div>
+      <div class="cards" id="perfCards"></div>
+      <div class="card" style="margin-top:14px"><h3>อัตราการบรรลุเป้าหมายรายหน่วยงาน (%)</h3><div class="chartbox tall"><canvas id="chPerf"></canvas></div></div>
+    </div>
+
+    <div class="sec-title"><span class="no" id="noCharts">2</span> การจำแนกตัวชี้วัด <small>ตามกลุ่มงาน ระดับ ยุทธศาสตร์ และหมวดเนื้อหา</small></div>
+    <div class="grid2">
+      <div class="card"><h3>คะแนนความพร้อมของตัวชี้วัด รายกลุ่มงาน (%)</h3><div class="chartbox"><canvas id="chGroup"></canvas></div></div>
+      <div class="card"><h3>การเชื่อมโยงยุทธศาสตร์และเกณฑ์ภายนอก (จำนวนตัวชี้วัด)</h3><div class="chartbox"><canvas id="chStrat"></canvas></div></div>
+    </div>
+    <div class="grid3" style="margin-top:14px">
+      <div class="card"><h3>หมวดตาม NQA (จำนวนตัวชี้วัด)</h3><div class="chartbox"><canvas id="chNQA"></canvas></div></div>
+      <div class="card"><h3>ระดับของตัวชี้วัด</h3><div class="chartbox"><canvas id="chLevel"></canvas></div></div>
+      <div class="card"><h3>หมวดตามเนื้อหา <span class="badge b-n">จัดกลุ่มอัตโนมัติ</span></h3><div class="chartbox"><canvas id="chCat"></canvas></div></div>
+    </div>
+
+    <div class="sec-title"><span class="no" id="noTable">3</span> สถานะรายหน่วยงาน / หอผู้ป่วย <small>คลิกแถว หรือเลือกวอร์ดจากแถบด้านซ้าย เพื่อดูรายงานเฉพาะวอร์ด</small></div>
+    <div class="card">
+      <div class="filters">
+        <select id="fGroup"><option value="">— ทุกกลุ่มงาน —</option></select>
+        <select id="fStatus">
+          <option value="">— ทุกสถานะ —</option>
+          <option value="g">พร้อม (≥ 80%)</option>
+          <option value="a">ดำเนินการ (50–79%)</option>
+          <option value="r">ต้องเร่งรัด (&lt; 50%)</option>
+          <option value="n">ไม่พบชีตข้อมูล</option>
+        </select>
+      </div>
+      <div class="tblwrap"><table id="unitTable"><thead></thead><tbody></tbody></table></div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--green)"></span>พร้อม ≥ 80%</span>
+        <span><span class="dot" style="background:var(--amber)"></span>ดำเนินการ 50–79%</span>
+        <span><span class="dot" style="background:var(--red)"></span>ต้องเร่งรัด &lt; 50%</span>
+        <span>คะแนนความพร้อม = ค่าเฉลี่ยของ 6 องค์ประกอบ: เกณฑ์เป้าหมาย · รหัส KPI · ผู้รับผิดชอบ · สูตรคำนวณ · ระดับ KPI · การเชื่อมยุทธศาสตร์/NQA</span>
+      </div>
+    </div>
+
+    <div class="sec-title"><span class="no" id="noAct">4</span> ประเด็นสำหรับผู้บริหารและแผนการดำเนินงาน <small>สรุปอัตโนมัติจากข้อมูลล่าสุด</small></div>
+    <div class="card actions"><ol id="actionList"></ol></div>
+  </section>
+
+  <!-- ===================== มุมมองรายวอร์ด ===================== -->
+  <section id="viewUnit" class="hidden">
+    <div class="card unit-head">
+      <div>
+        <div class="crumb"><a id="backHome">ภาพรวมโรงพยาบาล</a> › <span id="uGroup"></span></div>
+        <h2 id="uName"></h2>
+        <div id="uMeta"></div>
+      </div>
+      <div class="unit-nav">
+        <button class="btn2" id="uPrev">‹ วอร์ดก่อนหน้า</button>
+        <button class="btn2" id="uNext">วอร์ดถัดไป ›</button>
+      </div>
+    </div>
+    <div id="uBody">
+      <div class="cards" id="uCards" style="margin-top:14px"></div>
+      <div class="grid2" style="margin-top:14px">
+        <div class="card"><h3>องค์ประกอบความพร้อมของตัวชี้วัด (%)</h3><div class="chartbox"><canvas id="chUComp"></canvas></div></div>
+        <div class="card"><h3 id="uChart2Title">หมวดตามเนื้อหาของตัวชี้วัด</h3><div class="chartbox"><canvas id="chU2"></canvas></div></div>
+      </div>
+      <div class="sec-title">ประเด็นที่หน่วยงานต้องดำเนินการ</div>
+      <div class="card actions"><ol id="uActions"></ol></div>
+      <div class="sec-title">รายการตัวชี้วัดของหน่วยงาน</div>
+      <div class="card">
+        <div class="filters">
+          <select id="fKpiCat"><option value="">— ทุกหมวดตัวชี้วัด —</option><option>ความปลอดภัย/ความเสี่ยง</option><option>ผู้ใช้บริการ</option><option>บุคลากร</option><option>กระบวนการบริการ</option><option>การบริหาร/อื่น ๆ</option></select>
+          <select id="fKpiType">
+            <option value="">— แสดงทั้งหมด —</option>
+            <option value="notarget">ยังไม่กำหนดเกณฑ์เป้าหมาย</option>
+            <option value="noresp">ยังไม่มีผู้รับผิดชอบ</option>
+            <option value="nolevel">ยังไม่จัดระดับ KPI</option>
+            <option value="fail">ไม่ผ่านเกณฑ์เป้าหมาย</option>
+          </select>
+        </div>
+        <div class="tblwrap"><table id="kpiTable"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+    <div id="uMissing" class="card hidden" style="margin-top:14px"></div>
+  </section>
+
+  <footer>
+    แหล่งข้อมูล: Google Sheets “KPI_Mapping_NSO_Banmi” · ระบบดึงข้อมูลสดทุกครั้งที่เปิดหน้า และทุก 5 นาที<br>
+    จัดทำเพื่อใช้ประกอบการติดตามและวางแผนพัฒนาคุณภาพการพยาบาล กลุ่มภารกิจด้านการพยาบาล โรงพยาบาลบ้านหมี่
+  </footer>
+</main>
+</div>
+
+<script>
+/* ================= CONFIG ================= */
+const CONFIG = {
+  SHEET_ID: '1WqE8_JoTIrNEUHgyWfnBh86j9Fc8gCj71u20qPvX5qM',      // ID ของ Google Sheet
+  MAPPING_GID: '1055034844',                                      // gid ของชีต Mapping หน่วยงาน
+  MAPPING_PUB_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR48HCPRO9cNG-CGM2HTPWV6idwzjH5WstcG_WKkWvdyMJ8B5uhmrOuxG5mw7lgQ2B3oNgbuGl1ir5q/pub?output=csv', // สำรอง
+  REFRESH_MINUTES: 5,
+  CONCURRENCY: 6,
+  GOOD: 80, FAIR: 50
+};
+/* ========================================== */
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const norm = s => String(s ?? '').replace(/\s+/g,' ').trim();
+const pct = (a,b) => b ? Math.round(a*1000/b)/10 : 0;
+const charts = {};
+let STATE = { units: [], hasPerf: false };
+
+/* ---------- CSV ---------- */
+function parseCSV(text){
+  const rows=[]; let row=[], f='', q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){f+='"';i++;} else q=false; } else f+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){ row.push(f); f=''; }
+    else if(c==='\n'){ row.push(f); rows.push(row); row=[]; f=''; }
+    else if(c!=='\r') f+=c;
+  }
+  if(f!==''||row.length){ row.push(f); rows.push(row); }
+  return rows;
+}
+
+/* ---------- Fetch (CSV ก่อน, JSONP สำรอง) ---------- */
+const gvizBase = () => `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq`;
+async function fetchCSV(url){
+  const r = await fetch(url, {cache:'no-store'});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const t = await r.text();
+  if(/^\s*</.test(t)) throw new Error('ไม่ใช่ CSV (ชีตอาจยังไม่เปิดสิทธิ์)');
+  return parseCSV(t);
+}
+let jsonpN = 0;
+function fetchJSONP(params){
+  return new Promise((resolve,reject)=>{
+    const cb = '__gv'+(++jsonpN)+'_'+Date.now();
+    const s = document.createElement('script');
+    const timer = setTimeout(()=>{cleanup();reject(new Error('timeout'));},20000);
+    function cleanup(){ clearTimeout(timer); delete window[cb]; s.remove(); }
+    window[cb] = resp => {
+      cleanup();
+      if(resp.status==='error') return reject(new Error('gviz error'));
+      const t = resp.table;
+      const head = t.cols.map(c=>c.label||'');
+      const rows = t.rows.map(r => (r.c||[]).map(c => c==null ? '' : (c.f ?? c.v ?? '')));
+      resolve([head, ...rows]);
+    };
+    s.src = `${gvizBase()}?${params}&headers=1&tqx=out:json;responseHandler:${cb}`;
+    s.onerror = ()=>{cleanup();reject(new Error('script error'));};
+    document.head.appendChild(s);
+  });
+}
+async function getSheet(sel){ // sel = {sheet} | {gid}
+  const p = sel.gid ? `gid=${sel.gid}` : `sheet=${encodeURIComponent(sel.sheet)}`;
+  try { return await fetchCSV(`${gvizBase()}?tqx=out:csv&headers=1&${p}&_=${Date.now()}`); }
+  catch(e){ return await fetchJSONP(p); }
+}
+
+/* ---------- Mapping ---------- */
+async function loadMapping(){
+  let rows;
+  try { rows = await getSheet({gid:CONFIG.MAPPING_GID}); if(!rows[0].some(h=>/ชื่อ\s*sheet|รหัสหน่วยงาน/.test(h))) throw 0; }
+  catch(e){ rows = await fetchCSV(CONFIG.MAPPING_PUB_CSV+'&_='+Date.now()); }
+  const h = rows[0].map(norm);
+  const ix = re => h.findIndex(x=>re.test(x));
+  const iG=ix(/กลุ่มงาน/), iSP=ix(/Service Plan/i), iW=ix(/หอผู้ป่วย|หน่วยงาน$/), iAb=ix(/ชื่อย่อ/), iSh=ix(/ชื่อ\s*sheet|รหัสหน่วยงาน/i), iR=ix(/ผู้รับผิดชอบ/);
+  const units=[]; let lastG='';
+  for(const r of rows.slice(1)){
+    const ward = norm(r[iW]); const g = norm(r[iG]);
+    if(g && !ward && /สรุป/.test(g)) continue;
+    if(!ward) continue;
+    if(g) lastG = g;
+    units.push({ group: g || lastG, sp: norm(r[iSP]), ward, abbr: norm(r[iAb]), sheet: norm(r[iSh]), owner: iR>=0?norm(r[iR]):'' });
+  }
+  return units;
+}
+
+/* ---------- Unit sheet → KPI rows ---------- */
+const flag = v => { const s = norm(v).toLowerCase(); return !!s && !['0','false','-','no','ไม่','n','x?'].includes(s); };
+function mapCols(h){
+  const f = re => h.findIndex(x=>re.test(x));
+  const cols = {
+    no:f(/^ลำดับ/), code:f(/รหัส\s*KPI/i), name:f(/ชื่อตัวชี้วัด/), target:f(/เกณฑ์|เป้าหมาย/), unit:f(/หน่วยนับ/),
+    lvU:f(/ระดับ\s*หน่วยงาน/), lvG:f(/ระดับ\s*กลุ่มงาน/), lvN:f(/ระดับ\s*NSO/i), formula:f(/สูตร/),
+  };
+  const resp = h.map((x,i)=>/ผู้รับผิดชอบ/.test(x)?i:-1).filter(i=>i>=0);
+  cols.resp = resp;
+  cols.align = [
+    ['ยุทธ 1',f(/ยุ+ทธ\s*1/)],['ยุทธ 2',f(/ยุ+ทธ\s*2/)],['ยุทธ 3',f(/ยุ+ทธ\s*3/)],['ยุทธ 4',f(/ยุ+ทธ\s*4/)],
+    ['THIP',f(/THIP/i)],['เขต',f(/^เขต/)],['สมรรถนะหลัก',f(/สมรรถนะหลัก/)]
+  ].filter(a=>a[1]>=0);
+  cols.nqa = [
+    ['หมวด 1 การนำองค์กร',f(/หมวด\s*1/)],['หมวด 3 ผู้ใช้บริการ',f(/หมวด\s*3/)],['หมวด 5 บุคลากร',f(/หมวด\s*5/)],
+    ['หมวด 6 กระบวนการ',f(/หมวด\s*6/)],['มิติด้านบริการ',f(/มิติด้านบริการ/)],['มิติด้านประสิทธิภาพ',f(/มิติด้านประสิทธิภาพ/)]
+  ].filter(a=>a[1]>=0);
+  // คอลัมน์ผลการดำเนินงาน (ถ้ามีการเพิ่มในอนาคต)
+  const resRe = /ผลงาน|ผลการดำเนิน|ผลลัพธ์|ไตรมาส|^Q[1-4]\b|รอบ\s*\d|ต\.ค|พ\.ย|ธ\.ค|ม\.ค|ก\.พ|มี\.ค|เม\.ย|พ\.ค|มิ\.ย|ก\.ค|ส\.ค|ก\.ย/i;
+  cols.results = h.map((x,i)=> (x && resRe.test(x) && !/สูตร|เกณฑ์/.test(x)) ? i : -1).filter(i=>i>=0);
+  return cols;
+}
+function category(name){
+  if(/พึ+งพอใจ|ร้องเรียน|ผู้ใช้บริการ|ญาติ/.test(name)) return 'ผู้ใช้บริการ';
+  if(/บุคลากร/.test(name)) return 'บุคลากร';
+  if(/อุบัติการณ์|คลาดเคลื่อน|พลัดตก|แทรกซ้อน|บาดเจ็บ|ผิดคน|ไม่พึงประสงค์|กลับมารักษาซ้ำ|ติดเชื้อ/.test(name)) return 'ความปลอดภัย/ความเสี่ยง';
+  if(/ระยะเวลา|ภายใน|นาที|ชั่วโมง|Triage|Productivity|ผลิตภาพ/i.test(name)) return 'กระบวนการบริการ';
+  return 'การบริหาร/อื่น ๆ';
+}
+function parseNum(s){ const m = String(s).replace(/,/g,'').match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; }
+function lowerIsBetter(target, name){
+  const t = String(target);
+  if(/[<≤]|ไม่เกิน|น้อยกว่า/.test(t)) return true;
+  if(/[>≥]|ไม่น้อยกว่า|มากกว่า/.test(t)) return false;
+  if(parseNum(t)===0) return true;
+  return /อุบัติการณ์|ร้องเรียน|คลาดเคลื่อน|อัตราการเกิด|ไม่พึงพอใจ|ลาออก|โอนย้าย|ระยะเวลา|กลับมารักษาซ้ำ|พลัดตก/.test(name);
+}
+function evalKPI(k){
+  if(k.result===null || k.result==='') return 'none';
+  const t = parseNum(k.target), r = parseNum(k.result);
+  if(t===null || r===null) return 'none';
+  return (lowerIsBetter(k.target,k.name) ? r<=t : r>=t) ? 'pass' : 'fail';
+}
+function parseUnitSheet(rows){
+  const h = rows[0].map(norm);
+  if(!h.some(x=>/ชื่อตัวชี้วัด/.test(x))) return null; // ชื่อชีตไม่ตรง (gviz ส่งชีตแรกกลับมา)
+  const c = mapCols(h);
+  const kpis=[];
+  for(const r of rows.slice(1)){
+    const name = norm(r[c.name]);
+    if(!name) continue;
+    let result = null, resultLabel='';
+    for(const i of c.results){ const v=norm(r[i]); if(v!==''){ result=v; resultLabel=h[i]; } }
+    const k = {
+      no:norm(r[c.no]), code:norm(r[c.code]), name, target:norm(r[c.target]), unit:norm(r[c.unit]),
+      lvU:flag(r[c.lvU]), lvG:flag(r[c.lvG]), lvN:flag(r[c.lvN]), formula:norm(r[c.formula]),
+      resp:c.resp.map(i=>norm(r[i])).filter(Boolean).join(' / '),
+      align:c.align.filter(a=>flag(r[a[1]])).map(a=>a[0]),
+      nqa:c.nqa.filter(a=>flag(r[a[1]])).map(a=>a[0]),
+      result, resultLabel, cat:category(name)
+    };
+    k.status = evalKPI(k);
+    kpis.push(k);
+  }
+  return { kpis, hasResultCols: c.results.length>0, alignNames:c.align.map(a=>a[0]), nqaNames:c.nqa.map(a=>a[0]) };
+}
+function scoreUnit(u){
+  const k=u.kpis, n=k.length;
+  const m = {
+    target: pct(k.filter(x=>x.target!=='').length,n),
+    code:   pct(k.filter(x=>x.code).length,n),
+    resp:   pct(k.filter(x=>x.resp).length,n),
+    formula:pct(k.filter(x=>x.formula).length,n),
+    level:  pct(k.filter(x=>x.lvU||x.lvG||x.lvN).length,n),
+    align:  pct(k.filter(x=>x.align.length||x.nqa.length).length,n),
+  };
+  m.score = n ? Math.round((m.target+m.code+m.resp+m.formula+m.level+m.align)/6*10)/10 : 0;
+  const rep = k.filter(x=>x.status!=='none');
+  m.reported = rep.length; m.pass = rep.filter(x=>x.status==='pass').length; m.fail = rep.length-m.pass;
+  m.achieve = rep.length ? pct(m.pass, rep.length) : null;
+  return m;
+}
+const tone = s => s==null ? 'n' : s>=CONFIG.GOOD ? 'g' : s>=CONFIG.FAIR ? 'a' : 'r';
+const toneTxt = {g:'พร้อม',a:'ดำเนินการ',r:'ต้องเร่งรัด',n:'ไม่พบชีต'};
+const toneColor = {g:'var(--green)',a:'var(--amber)',r:'var(--red)',n:'#aab4bd'};
+const toneHex = {g:'#1e8e5a',a:'#c98a0b',r:'#c0392b',n:'#aab4bd'};
+
+/* ---------- Load all ---------- */
+async function loadAll(){
+  const st=$('#status'), stt=$('#statusText'), pb=$('#progBar');
+  st.classList.remove('err'); stt.textContent='กำลังอ่านชีต Mapping หน่วยงาน…'; pb.style.width='3%';
+  let units;
+  try{ units = await loadMapping(); }
+  catch(e){ st.classList.add('err'); stt.innerHTML='ไม่สามารถอ่านข้อมูลจาก Google Sheets ได้ — ตรวจสอบว่าชีตเปิดสิทธิ์ “ทุกคนที่มีลิงก์ดูได้” ('+esc(e.message)+')'; return; }
+  let done=0; const total=units.filter(u=>u.sheet).length;
+  const queue = units.filter(u=>u.sheet).slice();
+  async function worker(){
+    while(queue.length){
+      const u = queue.shift();
+      try{ const rows = await getSheet({sheet:u.sheet}); const p = parseUnitSheet(rows); if(p){ Object.assign(u,p); u.ok=true; } else u.ok=false; }
+      catch(e){ u.ok=false; }
+      done++; pb.style.width = (3+97*done/total)+'%'; stt.textContent=`กำลังดึงข้อมูลหน่วยงาน ${done}/${total} ชีต…`;
+    }
+  }
+  await Promise.all(Array.from({length:CONFIG.CONCURRENCY},worker));
+  units.forEach(u=>{ if(!u.ok){ u.kpis=[]; } u.m = u.ok ? scoreUnit(u) : null; });
+  STATE.units = units;
+  STATE.hasPerf = units.some(u=>u.ok && u.m.reported>0);
+  const okN = units.filter(u=>u.ok).length;
+  stt.textContent = `โหลดข้อมูลสำเร็จ ${okN} จาก ${units.length} หน่วยงาน` + (units.length-okN ? ` · ไม่พบชีตข้อมูล ${units.length-okN} หน่วยงาน` : '');
+  $('#stamp').textContent = new Date().toLocaleString('th-TH',{dateStyle:'long',timeStyle:'short'});
+  renderAll();
+}
+
+/* ---------- Render ---------- */
+let CUR_KEY = null;               // วอร์ดที่เลือก (ใช้ชื่อชีตเป็นกุญแจ) — null = ภาพรวม
+let SIDE_TONE = '';               // ตัวกรองสีในแถบด้านข้าง
+const COLLAPSED = new Set();
+const unitKey = u => u.sheet || u.ward;
+const curIndex = () => CUR_KEY==null ? -1 : STATE.units.findIndex(u=>unitKey(u)===CUR_KEY);
+
+function renderAll(){
+  renderOverview(); renderPerf(); renderCharts(); buildFilters(); renderUnitTable(); renderActions();
+  const shift = STATE.hasPerf ? 1 : 0;
+  $('#noCharts').textContent=2+shift; $('#noTable').textContent=3+shift; $('#noAct').textContent=4+shift;
+  renderSide(); showView();
+}
+function allKpis(){ return STATE.units.filter(u=>u.ok).flatMap(u=>u.kpis); }
+function card(lbl,val,sub,t=''){ return `<div class="card kpi ${t}"><div class="lbl">${lbl}</div><div class="val">${val}</div><div class="sub">${sub||''}</div></div>`; }
+const shortGroup = s => (s||'ไม่ระบุกลุ่มงาน').replace(/^\d+_/,'');
+
+/* ---------- Sidebar ---------- */
+function renderSide(){
+  const sg = $('#sGroup'), gsel = sg.value, ci = curIndex();
+  const allG=[...new Set(STATE.units.map(u=>u.group).filter(Boolean))];
+  sg.innerHTML='<option value="">— แสดงทุกกลุ่มงาน —</option>'+allG.map(g=>`<option value="${esc(g)}" ${g===gsel?'selected':''}>${esc(shortGroup(g))}</option>`).join('');
+  const cnt = {g:0,a:0,r:0,n:0};
+  STATE.units.forEach(u=>cnt[u.ok?tone(u.m.score):'n']++);
+  $('#sideSum').innerHTML = ['g','a','r','n'].map(t=>`<span class="badge b-${t} ${SIDE_TONE===t?'on':''}" data-t="${t}">${toneTxt[t]} ${cnt[t]}</span>`).join('');
+  document.querySelectorAll('#sideSum span').forEach(s=>s.onclick=()=>{ SIDE_TONE = SIDE_TONE===s.dataset.t?'':s.dataset.t; renderSide(); });
+  let html = `<a class="si home ${ci<0?'active':''}" data-i="-1">🏥 ภาพรวมโรงพยาบาล</a>`;
+  const groups = [];
+  STATE.units.forEach((u,i)=>{
+    const t = u.ok ? tone(u.m.score) : 'n';
+    if(SIDE_TONE && t!==SIDE_TONE) return;
+    if(gsel && u.group!==gsel) return;
+    let g = groups.find(x=>x.name===u.group); if(!g){ g={name:u.group,items:[]}; groups.push(g); }
+    g.items.push(`<a class="si ${i===ci?'active':''}" data-i="${i}" title="${esc(u.ward)}"><span class="dot" style="background:${toneColor[t]}"></span><span class="nm">${esc(u.ward)}</span><span class="sc">${u.ok?u.m.score+'%':'—'}</span></a>`);
+  });
+  groups.forEach(g=>{
+    const closed = COLLAPSED.has(g.name) && !gsel && !SIDE_TONE;
+    html += `<div class="sg ${closed?'closed':''}"><button class="sg-h" data-g="${esc(g.name)}"><span class="car">▾</span>${esc(shortGroup(g.name))}<span class="cnt">${g.items.length}</span></button><div class="sg-b">${g.items.join('')}</div></div>`;
+  });
+  if(!groups.length) html += '<div style="padding:14px;color:var(--gray);font-size:13px">ไม่พบวอร์ดตามเงื่อนไข</div>';
+  $('#sideNav').innerHTML = html;
+  document.querySelectorAll('#sideNav .si').forEach(a=>a.onclick=()=>selectUnit(+a.dataset.i));
+  document.querySelectorAll('#sideNav .sg-h').forEach(b=>b.onclick=()=>{ const g=b.dataset.g; COLLAPSED.has(g)?COLLAPSED.delete(g):COLLAPSED.add(g); renderSide(); });
+}
+function selectUnit(i){
+  CUR_KEY = i<0 ? null : unitKey(STATE.units[i]);
+  history.replaceState(null,'', CUR_KEY==null ? location.pathname+location.search : '#ward='+encodeURIComponent(CUR_KEY));
+  $('#side').classList.remove('open');
+  renderSide(); showView();
+  window.scrollTo({top:0,behavior:'smooth'});
+  const act = document.querySelector('#sideNav .si.active'); if(act) act.scrollIntoView({block:'nearest'});
+}
+function showView(){
+  const i = curIndex();
+  $('#viewOverview').classList.toggle('hidden', i>=0);
+  $('#viewUnit').classList.toggle('hidden', i<0);
+  if(i>=0) renderUnit(i);
+}
+
+/* ---------- Ward view ---------- */
+function renderUnit(i){
+  const U = STATE.units, u = U[i];
+  $('#uGroup').textContent = shortGroup(u.group);
+  $('#uName').textContent = u.ward;
+  $('#uPrev').disabled = i<=0; $('#uNext').disabled = i>=U.length-1;
+  $('#uPrev').onclick = ()=>selectUnit(i-1); $('#uNext').onclick = ()=>selectUnit(i+1);
+  const t = u.ok ? tone(u.m.score) : 'n';
+  $('#uMeta').innerHTML = [
+    u.abbr && `<span class="chip">${esc(u.abbr)}</span>`,
+    `<span class="chip">ชีต: ${esc(u.sheet||'ยังไม่กำหนด')}</span>`,
+    u.sp && u.sp!=='NA' && `<span class="chip">Service Plan: ${esc(u.sp)}</span>`,
+    `<span class="badge b-${t}">${u.ok?u.m.score+'% · ':''}${toneTxt[t]}</span>`
+  ].filter(Boolean).join(' ');
+  if(!u.ok){
+    $('#uBody').classList.add('hidden'); $('#uMissing').classList.remove('hidden');
+    $('#uMissing').innerHTML = `<h3>ไม่พบข้อมูลตัวชี้วัดของหน่วยงานนี้</h3><p class="note">${u.sheet
+      ? `ไม่พบแท็บชื่อ “${esc(u.sheet)}” ใน Google Sheet — ตรวจสอบว่าชื่อแท็บตรงกับคอลัมน์ “รหัสหน่วยงาน (ชื่อ sheet)” ในตาราง Mapping`
+      : 'ยังไม่ได้กำหนดชื่อชีตในคอลัมน์ “รหัสหน่วยงาน (ชื่อ sheet)” ของตาราง Mapping'}</p>`;
+    return;
+  }
+  $('#uBody').classList.remove('hidden'); $('#uMissing').classList.add('hidden');
+  const m = u.m, k = u.kpis, perf = STATE.hasPerf;
+  // อันดับในโรงพยาบาล
+  const ranked = U.filter(x=>x.ok).sort((a,b)=>b.m.score-a.m.score), rank = ranked.indexOf(u)+1;
+  $('#uCards').innerHTML =
+    card('จำนวนตัวชี้วัด', k.length, `${k.filter(x=>x.lvN).length} ตัวระดับ NSO`)+
+    card('คะแนนความพร้อม', `${m.score}<small>%</small>`, `อันดับ ${rank} จาก ${ranked.length} หน่วยงาน`, t)+
+    card('กำหนดเกณฑ์เป้าหมายแล้ว', `${m.target}<small>%</small>`, `ขาด ${k.filter(x=>x.target==='').length} ตัว`, tone(m.target))+
+    card('ระบุผู้รับผิดชอบแล้ว', `${m.resp}<small>%</small>`, `ขาด ${k.filter(x=>!x.resp).length} ตัว`, tone(m.resp))+
+    (perf ? card('บรรลุเป้าหมาย', m.achieve==null?'—':`${m.achieve}<small>%</small>`, `ผ่าน ${m.pass} · ไม่ผ่าน ${m.fail} · ยังไม่รายงาน ${k.length-m.reported}`, tone(m.achieve))
+          : card('เชื่อมยุทธศาสตร์/NQA', `${m.align}<small>%</small>`, `ขาด ${k.filter(x=>!x.align.length&&!x.nqa.length).length} ตัว`, tone(m.align)));
+  // charts
+  const compL=['เกณฑ์เป้าหมาย','รหัส KPI','ผู้รับผิดชอบ','สูตรคำนวณ','ระดับ KPI','เชื่อมยุทธ/NQA'], compV=[m.target,m.code,m.resp,m.formula,m.level,m.align];
+  drawChart('chUComp',{type:'bar',data:{labels:compL,datasets:[{label:'ครบถ้วน (%)',data:compV,backgroundColor:compV.map(v=>toneHex[tone(v)])}]},
+    options:{indexAxis:'y',scales:{x:{max:100,beginAtZero:true}},plugins:{legend:{display:false}}}});
+  if(perf){
+    $('#uChart2Title').textContent='สถานะผลการดำเนินงานเทียบเป้าหมาย';
+    drawChart('chU2',{type:'doughnut',data:{labels:['ผ่านเกณฑ์','ไม่ผ่านเกณฑ์','ยังไม่รายงาน'],datasets:[{data:[m.pass,m.fail,k.length-m.reported],backgroundColor:['#1e8e5a','#c0392b','#d5dde2']}]},
+      options:{plugins:{legend:{position:'bottom',labels:{boxWidth:12}}}}});
+  } else {
+    $('#uChart2Title').textContent='หมวดตามเนื้อหาของตัวชี้วัด';
+    const cats=['ความปลอดภัย/ความเสี่ยง','ผู้ใช้บริการ','บุคลากร','กระบวนการบริการ','การบริหาร/อื่น ๆ'];
+    drawChart('chU2',{type:'doughnut',data:{labels:cats,datasets:[{data:cats.map(c=>k.filter(x=>x.cat===c).length),backgroundColor:['#c0392b','#0f7c8c','#1e8e5a','#14a3b4','#8c9aa6']}]},
+      options:{plugins:{legend:{position:'bottom',labels:{boxWidth:12}}}}});
+  }
+  // ประเด็นของหน่วยงาน
+  const items=[], c = f => k.filter(f).length;
+  if(perf && m.fail) items.push(`<b>จัดทำแผนพัฒนา (CQI) สำหรับตัวชี้วัดที่ไม่ผ่านเกณฑ์ ${m.fail} ตัว</b>: ${k.filter(x=>x.status==='fail').slice(0,5).map(x=>esc(x.name)).join(' · ')}${m.fail>5?' และอื่น ๆ':''}`);
+  if(c(x=>x.target==='')) items.push(`<b>กำหนดเกณฑ์เป้าหมาย ${c(x=>x.target==='')} ตัวชี้วัด</b> ที่ยังว่างอยู่`);
+  if(c(x=>!x.resp)) items.push(`<b>มอบหมายผู้รับผิดชอบ ${c(x=>!x.resp)} ตัวชี้วัด</b>`);
+  if(c(x=>!x.code)) items.push(`<b>กำหนดรหัส KPI ${c(x=>!x.code)} รายการ</b>${u.sheet?` ตามรูปแบบของหน่วยงาน`:''}`);
+  if(c(x=>!x.formula)) items.push(`<b>ระบุสูตรคำนวณ ${c(x=>!x.formula)} ตัวชี้วัด</b>`);
+  if(c(x=>!x.lvU&&!x.lvG&&!x.lvN)) items.push(`<b>จัดระดับ KPI (หน่วยงาน / กลุ่มงาน / NSO) ${c(x=>!x.lvU&&!x.lvG&&!x.lvN)} ตัวชี้วัด</b> เพื่อเลือกตัวที่ต้องรายงานผู้บริหาร`);
+  if(c(x=>!x.align.length&&!x.nqa.length)) items.push(`<b>เชื่อมโยงยุทธศาสตร์/หมวด NQA ${c(x=>!x.align.length&&!x.nqa.length)} ตัวชี้วัด</b>`);
+  $('#uActions').innerHTML = items.length ? items.map(x=>`<li>${x}</li>`).join('') : '<li>ตัวชี้วัดของหน่วยงานครบถ้วนตามเกณฑ์แล้ว</li>';
+  renderKpiTable();
+}
+function renderKpiTable(){
+  const u = STATE.units[curIndex()]; if(!u||!u.ok) return;
+  const cat=$('#fKpiCat').value, ty=$('#fKpiType').value, perf=STATE.hasPerf;
+  const pass = k => !ty || (ty==='notarget'&&k.target==='') || (ty==='noresp'&&!k.resp) || (ty==='nolevel'&&!k.lvU&&!k.lvG&&!k.lvN) || (ty==='fail'&&k.status==='fail');
+  $('#kpiTable thead').innerHTML = `<tr><th class="num">ลำดับ</th><th>รหัส</th><th>ชื่อตัวชี้วัด</th><th class="num">เป้าหมาย</th><th>หน่วยนับ</th><th>ระดับ</th><th>เชื่อมยุทธศาสตร์ / NQA</th><th>ผู้รับผิดชอบ</th>${perf?'<th class="num">ผลงานล่าสุด</th><th>สถานะ</th>':''}</tr>`;
+  const rows = u.kpis.filter(k=>(!cat||k.cat===cat) && pass(k)).map(k=>{
+    const lv=[k.lvU&&'<span class="badge b-t">หน่วยงาน</span>',k.lvG&&'<span class="badge b-t">กลุ่มงาน</span>',k.lvN&&'<span class="badge b-t">NSO</span>'].filter(Boolean).join(' ')||'<span class="badge b-n">ยังไม่ระบุ</span>';
+    const al=[...k.align,...k.nqa].map(a=>`<span class="chip">${esc(a)}</span>`).join('')||'<span style="color:#aab4bd">—</span>';
+    const stt = k.status==='pass'?'<span class="badge b-g">ผ่าน</span>':k.status==='fail'?'<span class="badge b-r">ไม่ผ่าน</span>':'<span class="badge b-n">ยังไม่รายงาน</span>';
+    return `<tr><td class="num">${esc(k.no)}</td><td>${esc(k.code)||'<span style="color:#aab4bd">—</span>'}</td><td>${esc(k.name)}</td>
+      <td class="num">${k.target!==''?`<b>${esc(k.target)}</b>`:'<span class="badge b-a">ยังไม่กำหนด</span>'}</td><td>${esc(k.unit)}</td><td>${lv}</td><td>${al}</td>
+      <td>${esc(k.resp)||'<span style="color:#aab4bd">—</span>'}</td>${perf?`<td class="num" title="${esc(k.resultLabel)}">${esc(k.result??'—')}</td><td>${stt}</td>`:''}</tr>`;
+  });
+  $('#kpiTable tbody').innerHTML = rows.join('') || `<tr><td colspan="10" style="text-align:center;color:var(--gray)">ไม่พบตัวชี้วัดตามเงื่อนไข</td></tr>`;
+}
+
+function renderOverview(){
+  const U=STATE.units, ok=U.filter(u=>u.ok), K=allKpis(), n=K.length;
+  const groups = new Set(U.map(u=>u.group).filter(Boolean)).size;
+  const avgScore = ok.length ? Math.round(ok.reduce((s,u)=>s+u.m.score,0)/ok.length*10)/10 : 0;
+  const tgt = pct(K.filter(k=>k.target!=='').length,n), resp=pct(K.filter(k=>k.resp).length,n);
+  const lvl = pct(K.filter(k=>k.lvU||k.lvG||k.lvN).length,n), aln=pct(K.filter(k=>k.align.length||k.nqa.length).length,n);
+  const ready = ok.filter(u=>u.m.score>=CONFIG.GOOD).length;
+  $('#overviewCards').innerHTML =
+    card('หน่วยงาน / หอผู้ป่วย', `${U.length}`, `${groups} กลุ่มงาน · มีชีตข้อมูล ${ok.length}`)+
+    card('ตัวชี้วัดรวมทุกหน่วยงาน', n.toLocaleString(), `เฉลี่ย ${ok.length?Math.round(n/ok.length):0} ตัว/หน่วยงาน`)+
+    card('คะแนนความพร้อมเฉลี่ย', `${avgScore}<small>%</small>`, `พร้อมแล้ว ${ready} จาก ${ok.length} หน่วยงาน`, tone(avgScore))+
+    card('กำหนดเกณฑ์เป้าหมายแล้ว', `${tgt}<small>%</small>`, `${K.filter(k=>k.target==='').length} ตัวชี้วัดยังไม่มีเป้าหมาย`, tone(tgt))+
+    card('ระบุผู้รับผิดชอบแล้ว', `${resp}<small>%</small>`, 'ของตัวชี้วัดทั้งหมด', tone(resp))+
+    card('จัดระดับ KPI แล้ว', `${lvl}<small>%</small>`, 'หน่วยงาน / กลุ่มงาน / NSO', tone(lvl))+
+    card('เชื่อมยุทธศาสตร์/NQA', `${aln}<small>%</small>`, 'ยุทธ 1–4 · THIP · เขต · NQA', tone(aln));
+}
+
+function renderPerf(){
+  const sec=$('#perfSection');
+  if(!STATE.hasPerf){ sec.classList.add('hidden'); return; }
+  sec.classList.remove('hidden');
+  const K=allKpis(), rep=K.filter(k=>k.status!=='none'), pass=rep.filter(k=>k.status==='pass').length;
+  const ach = pct(pass,rep.length);
+  $('#perfCards').innerHTML =
+    card('ตัวชี้วัดที่รายงานผลแล้ว', rep.length.toLocaleString(), `จาก ${K.length} ตัว (${pct(rep.length,K.length)}%)`)+
+    card('ผ่านเกณฑ์เป้าหมาย', pass.toLocaleString(), `อัตราบรรลุ ${ach}%`, 'g')+
+    card('ไม่ผ่านเกณฑ์เป้าหมาย', (rep.length-pass).toLocaleString(), 'ต้องจัดทำแผนพัฒนา', 'r')+
+    card('อัตราบรรลุเป้าหมายรวม', `${ach}<small>%</small>`, 'ของตัวชี้วัดที่รายงานผล', tone(ach));
+  const us = STATE.units.filter(u=>u.ok && u.m.achieve!=null).sort((a,b)=>b.m.achieve-a.m.achieve);
+  drawChart('chPerf',{type:'bar',data:{labels:us.map(u=>u.ward),datasets:[{label:'บรรลุเป้าหมาย (%)',data:us.map(u=>u.m.achieve),backgroundColor:us.map(u=>toneHex[tone(u.m.achieve)])}]},
+    options:{indexAxis:'y',scales:{x:{max:100,beginAtZero:true}},plugins:{legend:{display:false}}}});
+}
+
+function drawChart(id,cfg){
+  if(typeof Chart==='undefined'){ const c=document.getElementById(id); if(c) c.parentNode.innerHTML='<p class="note">ไม่สามารถโหลดไลบรารีกราฟได้ (ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต) — ข้อมูลในตารางยังใช้งานได้ตามปกติ</p>'; return; }
+  if(charts[id]) charts[id].destroy();
+  cfg.options = Object.assign({responsive:true,maintainAspectRatio:false}, cfg.options||{});
+  charts[id] = new Chart(document.getElementById(id), cfg);
+}
+function renderCharts(){
+  if(typeof Chart!=='undefined') { Chart.defaults.font.family="'Sarabun',sans-serif"; Chart.defaults.font.size=13; Chart.defaults.color='#3b4a56'; }
+  const ok=STATE.units.filter(u=>u.ok), K=allKpis();
+  // by group
+  const g={}; ok.forEach(u=>{ const k=u.group||'ไม่ระบุ'; (g[k]=g[k]||[]).push(u.m.score); });
+  const gl=Object.keys(g), gv=gl.map(k=>Math.round(g[k].reduce((a,b)=>a+b,0)/g[k].length*10)/10);
+  drawChart('chGroup',{type:'bar',data:{labels:gl.map(s=>s.replace(/^\d+_/,'').replace('กลุ่มงานการพยาบาล','').replace('กลุ่มงาน','').trim()||s),
+    datasets:[{label:'คะแนนความพร้อม (%)',data:gv,backgroundColor:gv.map(v=>toneHex[tone(v)])}]},
+    options:{indexAxis:'y',scales:{x:{max:100,beginAtZero:true}},plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>gl[i[0].dataIndex]}}}}});
+  // strategy
+  const names = ok[0]?.alignNames || ['ยุทธ 1','ยุทธ 2','ยุทธ 3','ยุทธ 4','THIP','เขต','สมรรถนะหลัก'];
+  const sv = names.map(nm=>K.filter(k=>k.align.includes(nm)).length);
+  drawChart('chStrat',{type:'bar',data:{labels:names,datasets:[{label:'จำนวนตัวชี้วัด',data:sv,backgroundColor:'#0f7c8c'}]},
+    options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+  // NQA
+  const nn = ok[0]?.nqaNames || [];
+  const nv = nn.map(nm=>K.filter(k=>k.nqa.includes(nm)).length), none=K.filter(k=>!k.nqa.length).length;
+  drawChart('chNQA',{type:'doughnut',data:{labels:[...nn,'ยังไม่จัดหมวด'],datasets:[{data:[...nv,none],backgroundColor:['#0b3c5d','#0f7c8c','#14a3b4','#5cc1c9','#1e8e5a','#8bc6a6','#d5dde2']}]},
+    options:{plugins:{legend:{position:'bottom',labels:{boxWidth:12}}}}});
+  // level
+  const lv=[K.filter(k=>k.lvN).length,K.filter(k=>k.lvG).length,K.filter(k=>k.lvU).length,K.filter(k=>!k.lvU&&!k.lvG&&!k.lvN).length];
+  drawChart('chLevel',{type:'doughnut',data:{labels:['ระดับ NSO','ระดับกลุ่มงาน','ระดับหน่วยงาน','ยังไม่จัดระดับ'],datasets:[{data:lv,backgroundColor:['#0b3c5d','#0f7c8c','#14a3b4','#d5dde2']}]},
+    options:{plugins:{legend:{position:'bottom',labels:{boxWidth:12}}}}});
+  // category
+  const cats=['ความปลอดภัย/ความเสี่ยง','ผู้ใช้บริการ','บุคลากร','กระบวนการบริการ','การบริหาร/อื่น ๆ'];
+  drawChart('chCat',{type:'doughnut',data:{labels:cats,datasets:[{data:cats.map(c=>K.filter(k=>k.cat===c).length),backgroundColor:['#c0392b','#0f7c8c','#1e8e5a','#14a3b4','#8c9aa6']}]},
+    options:{plugins:{legend:{position:'bottom',labels:{boxWidth:12}}}}});
+}
+
+function buildFilters(){
+  const sel=$('#fGroup'), cur=sel.value;
+  const gs=[...new Set(STATE.units.map(u=>u.group).filter(Boolean))];
+  sel.innerHTML='<option value="">— ทุกกลุ่มงาน —</option>'+gs.map(g=>`<option ${g===cur?'selected':''}>${esc(g)}</option>`).join('');
+}
+const barCell = v => `<div style="display:flex;align-items:center;gap:6px"><div class="bar" style="flex:1"><div style="width:${v}%;background:${toneColor[tone(v)]}"></div></div><span style="min-width:40px;text-align:right">${v}%</span></div>`;
+function renderUnitTable(){
+  const fg=$('#fGroup').value, fs='', ft=$('#fStatus').value;
+  const perf=STATE.hasPerf;
+  $('#unitTable thead').innerHTML = `<tr><th>หน่วยงาน / หอผู้ป่วย</th><th>ชีต</th><th class="num">KPI</th><th>เกณฑ์เป้าหมาย</th><th>รหัส KPI</th><th>ผู้รับผิดชอบ</th><th>สูตรคำนวณ</th><th>ระดับ KPI</th><th>เชื่อมยุทธ/NQA</th><th>คะแนนความพร้อม</th>${perf?'<th class="num">บรรลุเป้า</th>':''}</tr>`;
+  let html='', lastG=null;
+  STATE.units.forEach((u,idx)=>{
+    const t = u.ok ? tone(u.m.score) : 'n';
+    if(fg && u.group!==fg) return;
+    if(ft && t!==ft) return;
+    if(fs && !(u.ward+' '+u.sheet+' '+u.abbr).toLowerCase().includes(fs)) return;
+    if(u.group!==lastG){ html+=`<tr class="grp"><td colspan="${perf?11:10}">${esc(u.group||'ไม่ระบุกลุ่มงาน')}</td></tr>`; lastG=u.group; }
+    if(!u.ok){ html+=`<tr class="unit-row" data-i="${idx}"><td>${esc(u.ward)}</td><td>${esc(u.sheet||'—')}</td><td colspan="${perf?9:8}"><span class="badge b-n">${u.sheet?'ไม่พบชีตข้อมูลชื่อนี้':'ยังไม่กำหนดชื่อชีต'}</span></td></tr>`; return; }
+    const m=u.m;
+    html+=`<tr class="unit-row" data-i="${idx}"><td><b>${esc(u.ward)}</b>${u.abbr?` <span class="chip">${esc(u.abbr)}</span>`:''}</td><td>${esc(u.sheet)}</td><td class="num">${u.kpis.length}</td>
+      <td>${barCell(m.target)}</td><td>${barCell(m.code)}</td><td>${barCell(m.resp)}</td><td>${barCell(m.formula)}</td><td>${barCell(m.level)}</td><td>${barCell(m.align)}</td>
+      <td><span class="badge b-${t}">${m.score}% · ${toneTxt[t]}</span></td>${perf?`<td class="num">${m.achieve==null?'—':`<span class="badge b-${tone(m.achieve)}">${m.achieve}%</span>`}</td>`:''}</tr>`;
+  });
+  $('#unitTable tbody').innerHTML = html || '<tr><td colspan="11" style="text-align:center;color:var(--gray)">ไม่พบข้อมูลตามเงื่อนไข</td></tr>';
+  document.querySelectorAll('#unitTable tr.unit-row').forEach(tr=>tr.onclick=()=>selectUnit(+tr.dataset.i));
+}
+function renderActions(){
+  const U=STATE.units, ok=U.filter(u=>u.ok), K=allKpis(), items=[];
+  const low = ok.filter(u=>u.m.score<CONFIG.FAIR).sort((a,b)=>a.m.score-b.m.score);
+  if(low.length) items.push(`<b>เร่งรัดความพร้อมของตัวชี้วัด ${low.length} หน่วยงาน</b> ที่คะแนนต่ำกว่า ${CONFIG.FAIR}% ได้แก่ ${low.slice(0,8).map(u=>`${esc(u.ward)} (${u.m.score}%)`).join(', ')}${low.length>8?' และอื่น ๆ':''}`);
+  const noT = K.filter(k=>k.target==='').length;
+  if(noT) items.push(`<b>กำหนดเกณฑ์เป้าหมายเพิ่มเติม ${noT.toLocaleString()} ตัวชี้วัด</b> (${pct(noT,K.length)}% ของทั้งหมด) เพื่อให้สามารถประเมินผลการดำเนินงานได้`);
+  const noR = K.filter(k=>!k.resp).length;
+  if(noR) items.push(`<b>มอบหมายผู้รับผิดชอบตัวชี้วัด ${noR.toLocaleString()} รายการ</b> ที่ยังไม่ระบุชื่อ เพื่อความชัดเจนในการติดตามและรายงานผล`);
+  const noC = K.filter(k=>!k.code).length;
+  if(noC) items.push(`<b>กำหนดรหัส KPI ${noC.toLocaleString()} รายการ</b> ให้เป็นไปตามรูปแบบรหัสหน่วยงาน (เช่น ER69_01) เพื่อเชื่อมโยงข้อมูลข้ามหน่วยงาน`);
+  const noF = K.filter(k=>!k.formula).length;
+  if(noF) items.push(`<b>ระบุสูตรคำนวณ ${noF.toLocaleString()} ตัวชี้วัด</b> เพื่อให้การเก็บข้อมูลเป็นมาตรฐานเดียวกันทุกหน่วยงาน`);
+  const noL = K.filter(k=>!k.lvU&&!k.lvG&&!k.lvN).length;
+  if(noL) items.push(`<b>จัดระดับตัวชี้วัด (หน่วยงาน / กลุ่มงาน / NSO) อีก ${noL.toLocaleString()} รายการ</b> เพื่อคัดกรองตัวชี้วัดที่ต้องรายงานต่อผู้บริหาร`);
+  const noA = K.filter(k=>!k.align.length&&!k.nqa.length).length;
+  if(noA) items.push(`<b>เชื่อมโยงตัวชี้วัดกับยุทธศาสตร์โรงพยาบาลและหมวด NQA อีก ${noA.toLocaleString()} รายการ</b> เพื่อแสดงการตอบสนองเป้าหมายองค์กร`);
+  const miss = U.filter(u=>!u.ok);
+  if(miss.length) items.push(`<b>ตรวจสอบชีตข้อมูล ${miss.length} หน่วยงาน</b> ที่ไม่พบหรือชื่อชีตไม่ตรงกับตาราง Mapping: ${miss.map(u=>`${esc(u.ward)}${u.sheet?' ['+esc(u.sheet)+']':''}`).join(', ')}`);
+  if(STATE.hasPerf){
+    const worst = ok.filter(u=>u.m.achieve!=null && u.m.achieve<CONFIG.GOOD).sort((a,b)=>a.m.achieve-b.m.achieve);
+    if(worst.length) items.unshift(`<b>หน่วยงานที่อัตราบรรลุเป้าหมายต่ำกว่า ${CONFIG.GOOD}%</b> ควรจัดทำแผนพัฒนา (CQI): ${worst.slice(0,8).map(u=>`${esc(u.ward)} (${u.m.achieve}%)`).join(', ')}`);
+  } else {
+    items.push(`<span style="color:var(--gray)">หมายเหตุ: ขณะนี้ยังไม่มีคอลัมน์ผลการดำเนินงานในชีตหน่วยงาน เมื่อเพิ่มคอลัมน์ที่มีชื่อเช่น “ผลงาน”, “ไตรมาส 1”, “รอบ 1” หรือชื่อเดือน (ต.ค., พ.ย. …) แดชบอร์ดจะแสดงส่วน “ผลการดำเนินงานเทียบเกณฑ์เป้าหมาย” และสถานะผ่าน/ไม่ผ่านโดยอัตโนมัติ</span>`);
+  }
+  $('#actionList').innerHTML = items.length ? items.map(i=>`<li>${i}</li>`).join('') : '<li>ตัวชี้วัดทุกหน่วยงานมีความครบถ้วนตามเกณฑ์</li>';
+}
+
+/* ---------- Events ---------- */
+['#fGroup','#fStatus'].forEach(s=>$(s).addEventListener('change',renderUnitTable));
+$('#sGroup').addEventListener('change',renderSide);
+$('#fKpiCat').addEventListener('change',renderKpiTable);
+$('#fKpiType').addEventListener('change',renderKpiTable);
+$('#backHome').addEventListener('click',()=>selectUnit(-1));
+$('#btnSide').addEventListener('click',e=>{ e.stopPropagation(); $('#side').classList.toggle('open'); });
+document.addEventListener('click',e=>{ const sd=$('#side'); if(sd.classList.contains('open') && !sd.contains(e.target)) sd.classList.remove('open'); });
+$('#btnReload').addEventListener('click',loadAll);
+$('#every').textContent = CONFIG.REFRESH_MINUTES;
+{ const m = location.hash.match(/ward=([^&]+)/); if(m) CUR_KEY = decodeURIComponent(m[1]); }
+window.addEventListener('hashchange',()=>{ const m = location.hash.match(/ward=([^&]+)/); CUR_KEY = m?decodeURIComponent(m[1]):null; if(STATE.units.length){ renderSide(); showView(); } });
+loadAll();
+setInterval(loadAll, CONFIG.REFRESH_MINUTES*60*1000);
+</script>
+</body>
+</html>
