@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 /* =========================================================
    ตั้งค่าแหล่งข้อมูล (แก้ไขที่ส่วน CONFIG ใน <script> ด้านล่าง)
@@ -208,7 +209,7 @@ nav#sideNav{overflow:auto;flex:1;padding:6px 0 30px}
 
     <div class="sec-title"><span class="no" id="noAct">4</span> ประเด็นสำหรับผู้บริหารและแผนการดำเนินงาน <small>สรุปอัตโนมัติจากข้อมูลล่าสุด</small></div>
     <div class="card actions"><ol id="actionList"></ol></div>
-    <details class="card" style="margin-top:14px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">หมายเหตุด้านข้อมูล (หน่วยงานที่ไม่มีชีตข้อมูล)</summary><ul id="dataNotes" style="margin:10px 0 0;font-size:14px;color:var(--gray)"></ul></details>
+    <details class="card" style="margin-top:14px"><summary style="cursor:pointer;font-weight:600;color:var(--navy)">หมายเหตุด้านข้อมูล (การจับคู่แท็บ และหน่วยงานที่อ่านข้อมูลไม่ได้)</summary><ul id="dataNotes" style="margin:10px 0 0;font-size:14px;color:var(--gray)"></ul></details>
   </section>
 
   <!-- ===================== มุมมองรายวอร์ด ===================== -->
@@ -263,6 +264,7 @@ nav#sideNav{overflow:auto;flex:1;padding:6px 0 30px}
 const CONFIG = {
   SHEET_ID: '1WqE8_JoTIrNEUHgyWfnBh86j9Fc8gCj71u20qPvX5qM',      // ID ของ Google Sheet
   MAPPING_GID: '1055034844',                                      // gid ของชีต Mapping หน่วยงาน
+  PUB_XLSX: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR48HCPRO9cNG-CGM2HTPWV6idwzjH5WstcG_WKkWvdyMJ8B5uhmrOuxG5mw7lgQ2B3oNgbuGl1ir5q/pub?output=xlsx', // ลิงก์เผยแพร่ทั้งไฟล์ (วิธีหลัก)
   MAPPING_PUB_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR48HCPRO9cNG-CGM2HTPWV6idwzjH5WstcG_WKkWvdyMJ8B5uhmrOuxG5mw7lgQ2B3oNgbuGl1ir5q/pub?output=csv',
   REFRESH_MINUTES: 5,
   CONCURRENCY: 6,
@@ -333,16 +335,14 @@ async function getSheet(p){
 }
 
 /* ---------- Mapping ---------- */
-async function loadMapping(){
-  const okMap = rows => rows && rows[0] && rows[0].some(h=>/ชื่อ\s*sheet|รหัสหน่วยงาน/i.test(norm(h)));
-  let rows;
-  try { rows = await fetchCSV(CONFIG.MAPPING_PUB_CSV+'&_='+Date.now()); if(!okMap(rows)) throw 0; }
-  catch(e){ rows = await getSheet(`gid=${CONFIG.MAPPING_GID}&headers=1`); if(!okMap(rows)) throw new Error('ไม่พบตาราง Mapping หน่วยงาน'); }
-  const h = rows[0].map(norm);
+function parseMapping(rows){
+  const hi = rows.slice(0,5).findIndex(r=>r.some(h=>/ชื่อ\s*sheet|รหัสหน่วยงาน/i.test(norm(h))));
+  if(hi<0) return null;
+  const h = rows[hi].map(norm);
   const ix = re => h.findIndex(x=>re.test(x));
   const iG=ix(/กลุ่มงาน/), iSP=ix(/Service Plan/i), iW=ix(/หอผู้ป่วย|หน่วยงาน$/), iAb=ix(/ชื่อย่อ/), iSh=ix(/ชื่อ\s*sheet|รหัสหน่วยงาน/i);
   const units=[]; let lastG='';
-  for(const r of rows.slice(1)){
+  for(const r of rows.slice(hi+1)){
     const ward = clean(r[iW]); const g = clean(r[iG]);
     if(!ward) continue;
     if(g) lastG = g;
@@ -350,6 +350,42 @@ async function loadMapping(){
   }
   return units;
 }
+async function loadMappingCSV(){
+  let rows;
+  try { rows = await fetchCSV(CONFIG.MAPPING_PUB_CSV+'&_='+Date.now()); const u=parseMapping(rows); if(u) return u; } catch(e){}
+  rows = await getSheet(`gid=${CONFIG.MAPPING_GID}&headers=1`);
+  const u = parseMapping(rows); if(!u) throw new Error('ไม่พบตาราง Mapping หน่วยงาน'); return u;
+}
+/* ดึงทั้งไฟล์ครั้งเดียว (Excel จากลิงก์ "เผยแพร่ไปยังเว็บ") — ได้ค่าตรงตามที่แสดงในชีต และได้รายชื่อแท็บจริง */
+async function loadWorkbook(){
+  if(typeof XLSX==='undefined') throw new Error('โหลดไลบรารีอ่าน Excel ไม่ได้');
+  const r = await fetch(CONFIG.PUB_XLSX+'&_='+Date.now(), {cache:'no-store'});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const wb = XLSX.read(await r.arrayBuffer(), {type:'array'});
+  const book = {};
+  wb.SheetNames.forEach(n=>{ book[n] = XLSX.utils.sheet_to_json(wb.Sheets[n], {header:1, raw:false, defval:'', blankrows:true}); });
+  return book;
+}
+/* จับคู่ชื่อชีตใน Mapping กับแท็บจริง: ตรงกันทุกตัว → ไม่สนตัวพิมพ์/ช่องว่าง → รหัสหลังขีดล่าง (เช่น 07_PC ↔ 06_PC) → ชื่อย่อ */
+function matchTab(u, tabs){
+  if(!u.sheet) return null;
+  const k = s => norm(s).toLowerCase().replace(/\s+/g,'');
+  if(tabs.includes(u.sheet)) return u.sheet;
+  const t1 = tabs.find(t=>k(t)===k(u.sheet)); if(t1) return t1;
+  const suf = s => k(s).replace(/^[0-9]+_/,'');
+  const code = suf(u.sheet);
+  if(code && code!==k(u.sheet)){ const c = tabs.filter(t=>suf(t)===code && suf(t)!==k(t)); if(c.length===1) return c[0]; }
+  const ab = k(u.abbr).replace(/[^a-z0-9]/g,'');
+  if(ab){ const c = tabs.filter(t=>suf(t)===ab); if(c.length===1) return c[0]; }
+  return null;
+}
+const missMsg = u => ({
+  nosheet:'ตาราง Mapping ไม่ได้ระบุชีตข้อมูลแยกสำหรับหน่วยงานนี้ (อาจรายงานรวมกับหน่วยงานอื่น)',
+  notab:`ตาราง Mapping ระบุชีต “${esc(u.sheet)}” แต่ไม่พบแท็บที่ตรงกันในไฟล์`,
+  format:`แท็บ “${esc(u.tab||u.sheet)}” ไม่ได้อยู่ในรูปแบบตารางตัวชี้วัด (ไม่พบหัวคอลัมน์ “ชื่อตัวชี้วัด”)`,
+  fetch:`ดึงข้อมูลแท็บ “${esc(u.sheet)}” ไม่สำเร็จ (การเชื่อมต่อขัดข้อง) — กด “ดึงข้อมูลล่าสุด” อีกครั้ง`
+}[u.err] || 'ไม่มีข้อมูล');
+const missShort = u => ({nosheet:'ไม่มีชีตแยก',notab:'ไม่พบแท็บในไฟล์',format:'รูปแบบไม่ใช่ตารางตัวชี้วัด',fetch:'ดึงข้อมูลไม่สำเร็จ'}[u.err]||'ไม่มีข้อมูล');
 
 /* ---------- อ่านชีตหน่วยงาน (รองรับรูปแบบที่ต่างกันของแต่ละวอร์ด) ---------- */
 const flag = v => { const s = norm(v).toLowerCase(); return !!s && !['0','false','-','no','ไม่','n'].includes(s); };
@@ -366,7 +402,7 @@ function parseUnitSheet(rows){
   // 1) หาคอลัมน์ "ชื่อตัวชี้วัด" และจำนวนแถวหัวตาราง (บางชีตมีหัว 1 แถว บางชีต 2 แถว)
   let nameCol = rows[0].findIndex(isNameHdr), hdrEnd = 0;
   if(nameCol<0){
-    for(let r=1;r<Math.min(rows.length,6);r++){ const i=rows[r].findIndex(isNameHdr); if(i>=0){ nameCol=i; hdrEnd=r; break; } }
+    for(let r=1;r<Math.min(rows.length,12);r++){ const i=rows[r].findIndex(isNameHdr); if(i>=0){ nameCol=i; hdrEnd=r; break; } }
   }
   if(nameCol<0) return null;   // ไม่ใช่ชีตตัวชี้วัด (เช่น gviz ส่งชีตแรกกลับมาเมื่อหาชื่อชีตไม่พบ)
   const nCols = Math.max(...rows.slice(0,8).map(r=>r.length));
@@ -469,29 +505,51 @@ let loading = false;
 async function loadAll(){
   if(loading) return; loading = true;
   const st=$('#status'), stt=$('#statusText'), pb=$('#progBar');
-  st.classList.remove('err'); stt.textContent='กำลังอ่านชีต Mapping หน่วยงาน…'; pb.style.width='3%';
-  let units;
-  try{ units = await loadMapping(); }
-  catch(e){ st.classList.add('err'); stt.innerHTML='ไม่สามารถอ่านข้อมูลจาก Google Sheets ได้ — ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต และสิทธิ์ “ทุกคนที่มีลิงก์ดูได้” ('+esc(e.message)+')'; loading=false; return; }
-  const cache = {};   // ชีตเดียวกันที่อ้างซ้ำ ดึงครั้งเดียว
-  const queue = units.filter(u=>u.sheet), total = queue.length; let done=0;
-  async function worker(){
-    while(queue.length){
-      const u = queue.shift();
-      try{
-        cache[u.sheet] = cache[u.sheet] || getSheet(`sheet=${encodeURIComponent(u.sheet)}&headers=1`);
-        const p = parseUnitSheet(await cache[u.sheet]);
-        if(p){ Object.assign(u,p); u.ok=true; } else u.ok=false;
-      } catch(e){ u.ok=false; }
-      done++; pb.style.width = (3+97*done/total)+'%'; stt.textContent=`กำลังดึงข้อมูลหน่วยงาน ${done}/${total} ชีต…`;
+  st.classList.remove('err'); stt.textContent='กำลังดาวน์โหลดข้อมูลจาก Google Sheets…'; pb.style.width='5%';
+  let units, source='';
+  try{
+    // วิธีหลัก: ดึงทั้งไฟล์ครั้งเดียว
+    const book = await loadWorkbook(); pb.style.width='60%';
+    const tabs = Object.keys(book);
+    const mapTab = tabs.find(t=>parseMapping(book[t]));
+    if(!mapTab) throw new Error('ไม่พบแท็บตาราง Mapping');
+    units = parseMapping(book[mapTab]);
+    units.forEach(u=>{
+      if(!u.sheet){ u.err='nosheet'; return; }
+      u.tab = matchTab(u, tabs.filter(t=>t!==mapTab));
+      if(!u.tab){ u.err='notab'; return; }
+      const p = parseUnitSheet(book[u.tab]);
+      if(p){ Object.assign(u,p); u.ok=true; } else u.err='format';
+    });
+    source = `ดึงทั้งไฟล์ (${tabs.length} แท็บ)`;
+  } catch(e1){
+    // วิธีสำรอง: อ่านทีละแท็บผ่าน gviz
+    console.warn('ใช้วิธีสำรอง:', e1);
+    try{ units = await loadMappingCSV(); }
+    catch(e){ st.classList.add('err'); stt.innerHTML='ไม่สามารถอ่านข้อมูลจาก Google Sheets ได้ — ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต และการ “เผยแพร่ไปยังเว็บ” ของชีต ('+esc(e1.message)+' / '+esc(e.message)+')'; loading=false; return; }
+    const cache = {}, queue = units.filter(u=>u.sheet), total = queue.length; let done=0;
+    units.forEach(u=>{ if(!u.sheet) u.err='nosheet'; });
+    async function worker(){
+      while(queue.length){
+        const u = queue.shift();
+        try{
+          cache[u.sheet] = cache[u.sheet] || getSheet(`sheet=${encodeURIComponent(u.sheet)}&headers=1`);
+          const p = parseUnitSheet(await cache[u.sheet]);
+          if(p){ Object.assign(u,p); u.ok=true; u.tab=u.sheet; } else u.err='notab';
+        } catch(e){ u.err='fetch'; }
+        done++; pb.style.width = (5+95*done/total)+'%'; stt.textContent=`กำลังดึงข้อมูลหน่วยงาน ${done}/${total} ชีต…`;
+      }
     }
+    await Promise.all(Array.from({length:CONFIG.CONCURRENCY},worker));
+    source = 'อ่านทีละแท็บ (วิธีสำรอง)';
   }
-  await Promise.all(Array.from({length:CONFIG.CONCURRENCY},worker));
+  pb.style.width='100%';
   units.forEach(u=>{ if(!u.ok){ u.ok=false; u.kpis=[]; } u.m = u.ok ? scoreUnit(u) : null; });
   STATE.units = units;
   STATE.hasPerf = units.some(u=>u.ok && u.m.reported>0);
-  const okN = units.filter(u=>u.ok).length;
-  stt.textContent = `โหลดข้อมูลสำเร็จ ${okN} จาก ${units.length} หน่วยงาน · ตัวชี้วัด ${allKpis().length.toLocaleString()} รายการ`;
+  const okN = units.filter(u=>u.ok).length, fetchErr = units.filter(u=>u.err==='fetch').length;
+  stt.textContent = `โหลดข้อมูลสำเร็จ ${okN} จาก ${units.length} หน่วยงาน · ตัวชี้วัด ${allKpis().length.toLocaleString()} รายการ · ${source}` + (fetchErr?` · ดึงไม่สำเร็จ ${fetchErr} แท็บ`:'');
+  st.classList.toggle('err', okN===0);
   $('#stamp').textContent = new Date().toLocaleString('th-TH',{dateStyle:'long',timeStyle:'short'});
   renderAll();
   loading = false;
@@ -628,8 +686,8 @@ function renderUnitTable(){
     if(fg && u.group!==fg) return;
     if(ft && t!==ft) return;
     if(u.group!==lastG){ html+=`<tr class="grp"><td colspan="${cols}">${esc(shortGroup(u.group))}</td></tr>`; lastG=u.group; }
-    const nm = `<b>${esc(u.ward)}</b><div style="font-size:12px;color:var(--gray)">${esc(u.sheet||'ไม่มีชีตแยก')}</div>`;
-    if(!u.ok){ html+=`<tr class="unit-row" data-i="${idx}"><td>${nm}</td><td colspan="${cols-1}"><span class="badge b-n">${u.sheet?'ไม่พบแท็บข้อมูลชื่อนี้ในชีต':'ไม่มีชีตข้อมูลแยกในตาราง Mapping'}</span></td></tr>`; return; }
+    const nm = `<b>${esc(u.ward)}</b><div style="font-size:12px;color:var(--gray)">${esc(u.tab||u.sheet||'ไม่มีชีตแยก')}${u.tab&&u.tab!==u.sheet?` (Mapping: ${esc(u.sheet)})`:''}</div>`;
+    if(!u.ok){ html+=`<tr class="unit-row" data-i="${idx}"><td>${nm}</td><td colspan="${cols-1}"><span class="badge b-n">${missShort(u)}</span></td></tr>`; return; }
     const m=u.m;
     html+=`<tr class="unit-row" data-i="${idx}"><td>${nm}</td><td class="num">${u.kpis.length}</td>
       <td>${barCell(m.target)}</td><td>${barCell(m.resp)}</td><td>${barCell(m.formula)}</td><td class="num">${m.nso||'—'}</td><td class="num">${m.strat||'—'}</td>
@@ -658,8 +716,9 @@ function renderActions(){
   $('#actionList').innerHTML = items.map(i=>`<li>${i}</li>`).join('');
   const miss = U.filter(u=>!u.ok);
   $('#dataNotes').innerHTML = miss.length
-    ? miss.map(u=>`<li>${esc(u.ward)} — ${u.sheet?`ไม่พบแท็บ “${esc(u.sheet)}” ในชีต`:'ไม่มีชีตข้อมูลแยกในตาราง Mapping'}</li>`).join('')
-    : '<li>อ่านข้อมูลได้ครบทุกหน่วยงานในตาราง Mapping</li>';
+    ? miss.map(u=>`<li>${esc(u.ward)} — ${missMsg(u)}</li>`).join('') : '<li>อ่านข้อมูลได้ครบทุกหน่วยงานในตาราง Mapping</li>';
+  const remap = U.filter(u=>u.ok && u.tab && u.tab!==u.sheet);
+  if(remap.length) $('#dataNotes').innerHTML += remap.map(u=>`<li>${esc(u.ward)} — ตาราง Mapping เขียน “${esc(u.sheet)}” แต่แท็บจริงชื่อ “${esc(u.tab)}” (ระบบจับคู่ให้อัตโนมัติ)</li>`).join('');
 }
 
 /* ---------- Ward view ---------- */
@@ -672,15 +731,13 @@ function renderUnit(i){
   const t = u.ok ? tone(u.m.score) : 'n';
   $('#uMeta').innerHTML = [
     u.abbr && `<span class="chip">${esc(u.abbr)}</span>`,
-    `<span class="chip">ชีต: ${esc(u.sheet||'ไม่มีชีตแยก')}</span>`,
+    `<span class="chip">แท็บ: ${esc(u.tab||u.sheet||'ไม่มีชีตแยก')}</span>`,
     u.sp && u.sp!=='NA' && `<span class="chip">Service Plan: ${esc(u.sp)}</span>`,
     `<span class="badge b-${t}">${u.ok?'ข้อมูล '+u.m.score+'% · ':''}${toneTxt[t]}</span>`
   ].filter(Boolean).join(' ');
   if(!u.ok){
     $('#uBody').classList.add('hidden'); $('#uMissing').classList.remove('hidden');
-    $('#uMissing').innerHTML = `<h3>ยังไม่มีข้อมูลตัวชี้วัดของหน่วยงานนี้</h3><p class="note">${u.sheet
-      ? `ตาราง Mapping ระบุชีตชื่อ “${esc(u.sheet)}” แต่ไม่พบแท็บชื่อนี้ใน Google Sheet`
-      : 'ตาราง Mapping ไม่ได้ระบุชีตข้อมูลแยกสำหรับหน่วยงานนี้ (อาจรายงานรวมกับหน่วยงานอื่นในกลุ่มงานเดียวกัน)'}</p>`;
+    $('#uMissing').innerHTML = `<h3>ยังไม่มีข้อมูลตัวชี้วัดของหน่วยงานนี้</h3><p class="note">${missMsg(u)}</p>`;
     return;
   }
   $('#uBody').classList.remove('hidden'); $('#uMissing').classList.add('hidden');
